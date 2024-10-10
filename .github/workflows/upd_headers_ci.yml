@@ -1,9 +1,9 @@
-name: Update Headers CI
+name: Update Headers CI DEV
 
 on:
   # push:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '41 14 * * *'
   workflow_dispatch:
 
 env:
@@ -15,7 +15,8 @@ env:
 jobs:
 
   upd_headers:
-    if: ${{ github.repository_owner == 'OpenRadioss' }}
+    # if: ${{ github.repository_owner == 'OpenRadioss' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository_owner == 'OpenRadioss' && github.ref == 'dev/ci/hm_reader_intermediate' }}
 
     # DEV ONLY # runs-on: ["dev_update_headers"]
     runs-on: ["update_headers"]
@@ -28,41 +29,41 @@ jobs:
         - /etc/localtime:/etc/localtime:ro
 
     steps:
+      - echo "Hello"
+      # # Get last git modifications, WS is not persistent here
+      # - uses: actions/checkout@v4
+      #   with:
+      #     lfs: 'true'
+      #     # Use a PAT else the push won't trigger the next workflow
+      #     token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
 
-      # Get last git modifications, WS is not persistent here
-      - uses: actions/checkout@v4
-        with:
-          lfs: 'true'
-          # Use a PAT else the push won't trigger the next workflow
-          token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
+      # - name: Running the update header script
+      #   run: |
+      #     cd scripts
+      #     python ./headers.py
+      #     cd ..
+      #     # Clean temporary files (if any) 
+      #     git clean -f
 
-      - name: Running the update header script
-        run: |
-          cd scripts
-          python ./headers.py
-          cd ..
-          # Clean temporary files (if any) 
-          git clean -f
+      # - name: Submiting files if any
+      #   run: |
+      #     # Check if new files
+      #     if [[ -n $(git status --porcelain) ]]
+      #     then
+      #         # Commit
+      #         export THEDATE=`date`
+      #         git config --global user.name "$GIT_SERVBOT_USER"
+      #         git config --global user.email "$GIT_SERVBOT_EMAIL"
+      #         git add .
+      #         git commit -m "Update Headers at $THEDATE"  
+      #         echo "GO_PUSH=1" >> $GITHUB_ENV
+      #     else
+      #       echo "No files to submit"
+      #     fi
 
-      - name: Submiting files if any
-        run: |
-          # Check if new files
-          if [[ -n $(git status --porcelain) ]]
-          then
-              # Commit
-              export THEDATE=`date`
-              git config --global user.name "$GIT_SERVBOT_USER"
-              git config --global user.email "$GIT_SERVBOT_EMAIL"
-              git add .
-              git commit -m "Update Headers at $THEDATE"  
-              echo "GO_PUSH=1" >> $GITHUB_ENV
-          else
-            echo "No files to submit"
-          fi
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        if: ${{ env.GO_PUSH == 1 }} 
-        with:
-          github_token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
-          branch: ${{ github.ref }}      
+      # - name: Push changes
+      #   uses: ad-m/github-push-action@master
+      #   if: ${{ env.GO_PUSH == 1 }} 
+      #   with:
+      #     github_token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
+      #     branch: ${{ github.ref }}      
