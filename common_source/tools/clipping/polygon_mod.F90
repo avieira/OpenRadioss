@@ -37,7 +37,7 @@
         type polygon_
           type(polygon_point_), allocatable, dimension(:) :: point
           integer :: numpoint ! defined points
-          integer :: size ! allocated size numpoint <= size)
+          integer :: size ! allocated size numpoint <= size
           my_real :: area
           my_real :: diag ! maximum dimension along y and z
         end type polygon_
@@ -46,6 +46,11 @@
           integer num_polygons
           type(polygon_),allocatable,dimension(:) :: polygon
         end type polygon_list_
+
+        type polygon_linked_list_
+          type(polygon_), pointer :: p
+          type(polygon_linked_list_), pointer :: next
+        end type polygon_linked_list_
 
       contains
 
@@ -197,6 +202,9 @@
       !||    polygon_destroy        ../common_source/tools/clipping/polygon_mod.F90
       !||--- uses       -----------------------------------------------------
       !||    constant_mod           ../common_source/modules/constant_mod.F
+      !||--- called by ------------------------------------------------------
+      !||    polygon_linked_list_destroy   ../common_source/tools/clipping/polygon_mod.F90
+      !||    polygon_linked_list_delete_element   ../common_source/tools/clipping/polygon_mod.F90
       !||====================================================================
         subroutine polygon_list_destroy(list)
           use constant_mod , only : zero
@@ -227,6 +235,9 @@
 !! \details
       !||====================================================================
       !||    polygon_copy   ../common_source/tools/clipping/polygon_mod.F90
+      !||--- called by ------------------------------------------------------
+      !||    polygon_linked_list_insert_before   ../common_source/tools/clipping/polygon_mod.F90
+      !||    polygon_linked_list_insert_after   ../common_source/tools/clipping/polygon_mod.F90
       !||====================================================================
         subroutine polygon_copy(Base_polygon, Target_polygon)
           implicit none
@@ -258,4 +269,183 @@
         end subroutine polygon_copy
 
 
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+      !||====================================================================
+      !||    polygon_linked_list_insert_before   ../common_source/tools/clipping/polygon_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    polygon_copy   ../common_source/tools/clipping/polygon_mod.F90
+      !||====================================================================
+        function polygon_linked_list_insert_before(list, p) result(new_elem)
+          implicit none
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), intent(in), pointer :: list
+          type(polygon_), intent(in) :: p
+          type(polygon_linked_list_), pointer :: new_elem
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          allocate(new_elem)
+          polygon_copy(p, new_elem%p)
+          new_elem%next => list
+        end function polygon_linked_list_insert_before
+
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+      !||====================================================================
+      !||    polygon_linked_list_insert_after      ../common_source/tools/clipping/polygon_mod.F90
+      !||--- called by ------------------------------------------------------
+      !||    polygon_linked_list_copy              ../common_source/tools/clipping/polygon_mod.F90
+      !||    Clipping_Sutherland_Hodgman           ../common_source/tools/clipping/polygon_clipping_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    polygon_copy                          ../common_source/tools/clipping/polygon_mod.F90
+      !||====================================================================
+        subroutine polygon_linked_list_insert_after(list, p)
+          implicit none
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), intent(inout) :: list
+          type(polygon_), intent(in) :: p
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_), pointer :: old_next
+          type(polygon_linked_list_), target :: new_elem
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          if (.not. associated(list)) then 
+            allocate(list)
+            polygon_copy(p, list%p)
+            nullify(list%next)
+          else 
+            allocate(new_elem)
+            polygon_copy(p, new_elem%p)
+            new_elem%next => list%next
+            list%next => new_elem
+          end if
+        end subroutine polygon_linked_list_insert_after
+
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+      !||====================================================================
+      !||    polygon_linked_list_copy   ../common_source/tools/clipping/polygon_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    polygon_linked_list_insert_after   ../common_source/tools/clipping/polygon_mod.F90
+      !||====================================================================
+        subroutine polygon_linked_list_copy(original, targ)
+          implicit none
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), intent(in) :: original
+          type(polygon_linked_list_), intent(out) :: targ
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_) :: current_targ, current_original
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          allocate(targ)
+          if (associated(original)) then
+            nullify(targ%next)
+            current_original => original
+            current_targ => targ
+            do while ( associated(current_original) )
+              polygon_linked_list_insert_after(current_targ, current%p)
+              current_original => current_original%next
+              current_targ => current_targ%next
+            end do
+          else
+            nullify(targ)
+          end if
+        end subroutine polygon_linked_list_copy
+    
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+      !||====================================================================
+      !||    polygon_linked_list_destroy   ../common_source/tools/clipping/polygon_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    polygon_destroy   ../common_source/tools/clipping/polygon_mod.F90
+      !||====================================================================
+        subroutine polygon_linked_list_destroy( list )
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), pointer  :: list
+        
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), pointer  :: current
+          type(polygon_linked_list_), pointer  :: next
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          current => list
+          do while ( associated(current%next) )
+              next => current%next
+              polygon_destroy(current%p)
+              deallocate( current )
+              current => next
+          enddo
+        end subroutine polygon_linked_list_destroy
+
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+      !||====================================================================
+      !||    polygon_linked_list_delete_element   ../common_source/tools/clipping/polygon_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    polygon_destroy   ../common_source/tools/clipping/polygon_mod.F90
+      !||====================================================================
+        subroutine polygon_linked_list_delete_element( list, elem )
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), pointer  :: list
+          type(polygon_linked_list_), pointer  :: elem
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(polygon_linked_list_), pointer  :: current
+          type(polygon_linked_list_), pointer  :: prev
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          if ( associated(list,elem) ) then
+              list => elem%next
+              polygon_destroy(elem%p)
+              deallocate( elem )
+          else
+              current => list
+              prev    => list
+              do while ( associated(current) )
+                  if ( associated(current,elem) ) then
+                      prev%next => current%next
+                      polygon_destroy(elem%p)
+                      deallocate( current ) ! Is also "elem"
+                      exit
+                  endif
+                  prev    => current
+                  current => current%next
+              enddo
+          endif
+        end subroutine polygon_linked_list_delete_element
     end module polygon_mod

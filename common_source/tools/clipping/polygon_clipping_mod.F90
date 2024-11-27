@@ -20,15 +20,19 @@
 !Copyright>        As an alternative to this open-source version, Altair also offers Altair Radioss
 !Copyright>        software under a commercial license.  Contact Altair to discuss further if the
 !Copyright>        commercial version may interest you: https://www.altair.com/radioss/.
+
       !||====================================================================
       !||    polygon_clipping_mod      ../common_source/tools/clipping/polygon_clipping_mod.F90
       !||--- called by ------------------------------------------------------
       !||    init_inivol_2d_polygons   ../starter/source/initial_conditions/inivol/init_inivol_2D_polygons.F90
+      !||    points_array_reindex      ../common_source/tools/sort/array_reindex.F90
       !||--- uses       -----------------------------------------------------
       !||    polygon_mod               ../common_source/tools/clipping/polygon_mod.F90
+      !||    SutherlandHodgmanUtil_mod ../common_source/tools/clipping/SutherlandHodgmanUtil_mod.F90
       !||====================================================================
       module polygon_clipping_mod
         use polygon_mod
+        use SutherlandHodgmanUtil_mod, only : edgeClipping
         implicit none
 #include  "my_real.inc"
 
@@ -107,7 +111,6 @@
     integer ii, jj
     logical is_found
     is_found = .false.
-    out_edge_pos = -HUGE(out_edge_pos)
     do ii=1,list_size
       do jj=2,List_Edge(ii)%numpoints-1
         if(List_Edge(ii)%point_id(jj) == point_id)then
@@ -149,9 +152,7 @@
 
       ii = currentPoint%id_edge
       kk = currentPoint%id_point
-      num_pt_on_edge = 2
-      size_ = 0
-      iorient = -1
+
       if(icur_list == 1)then
         size_ = size1
         iorient = list1(ii)%iorient(kk)
@@ -239,7 +240,7 @@
       !||--- calls      -----------------------------------------------------
       !||    integer_array_reindex            ../common_source/tools/sort/array_reindex.F90
       !||    nextpoint                        ../common_source/tools/clipping/polygon_clipping_mod.F90
-      !||    points_array_reindex             ../common_source/tools/clipping/polygon_clipping_mod.F90
+      !||    points_array_reindex             ../common_source/tools/sort/array_reindex.F90
       !||    polygon_addpoint                 ../common_source/tools/clipping/polygon_mod.F90
       !||    polygon_create                   ../common_source/tools/clipping/polygon_mod.F90
       !||    real_insertion_sort_with_index   ../common_source/tools/sort/insertion_sort.F90
@@ -252,7 +253,6 @@
 ! ----------------------------------------------------------------------------------------------------------------------
           use constant_mod , only : zero, em10, em06, one, ep20
           use insertion_sort_mod , only : real_insertion_sort_with_index
-          use array_reindex_mod , only : integer_array_reindex
           implicit none
 #include "my_real.inc"
 ! ----------------------------------------------------------------------------------------------------------------------
@@ -315,7 +315,6 @@
           numPtmax = num_points_1*num_points_2
           point_id = 0
           iStatus = 0
-          kk_bis = 0
 
           ! init. list 1 (Clipped polygon)
           allocate(list_edges_1(num_edges_1))
@@ -780,45 +779,76 @@
 
       end function polygon_is_point_inside
 
-
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-!! \brief   This subroutine is reindexing a array of POINTS using index(1:n) array
-!! \details      Example array = (/ P1 P2 P3 P4/)
-!! \details              index = (/4 3 2 1/)
-!! \details      result will be  (/ P4 P3 P2 P1 /)
+! --- POLYGONAL CLIPPING WITH SUTHERLAND–HODGMAN ALGORITHM
+! pre-condition : clipped polygon has no self intersection, clipping polygon must be convex
+! details : Clipped polygon is user polygon. Clipping polygon is elem from user mesh
       !||====================================================================
-      !||    points_array_reindex       ../common_source/tools/clipping/polygon_clipping_mod.F90
-      !||--- called by ------------------------------------------------------
-      !||    clipping_weiler_atherton   ../common_source/tools/clipping/polygon_clipping_mod.F90
+      !||    Clipping_Sutherland_Hodgman           ../common_source/tools/clipping/polygon_clipping_mod.F90
+      !||--- calls      -----------------------------------------------------
+      !||    edgeClipping                          ../common_source/tools/clipping/SutherlandHodgmanUtil_mod.F90
+      !||    polygon_linked_list_insert_after      ../common_source/tools/clipping/polygon_mod.F90
+      !||--- uses       -----------------------------------------------------
+      !||    constant_mod                          ../common_source/modules/constant_mod.F
       !||====================================================================
-      subroutine points_array_reindex(array, index, n)
-        implicit none
+        subroutine Clipping_Sutherland_Hodgman(ClippedPolygon, ClippingPolygon, Clipped_in, Clipped_out, iStatus)
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Modules
+! ----------------------------------------------------------------------------------------------------------------------
+          use constant_mod , only : zero
+          implicit none
 #include "my_real.inc"
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
-        integer, intent(in) :: n
-        type(polygon_point_), intent(inout) :: array(n)
-        integer, intent(inout) :: index(n)
+          type(polygon_linked_list_), pointer, intent(in) :: ClippedPolygon      !< Clipped Polygon
+          type(polygon_), intent(in) :: ClippingPolygon     !< Clipping Polygon
+          type(polygon_linked_list_), pointer, intent(out) :: Clipped_in    !< Polygons clipped
+          type(polygon_linked_list_), pointer, intent(out) :: Clipped_out   !< Polygons remaining from ClippedPolygon that are not clipped
+          integer,intent(inout) :: iStatus                  !< return code for algorithm status
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Local Variables
 ! ----------------------------------------------------------------------------------------------------------------------
-        integer :: ii
-        type(polygon_point_) :: temp_array(n)
+          type(polygon_linked_list_), pointer :: workPolygon_in, workPolygon_out, inserted_polygon
+          integer :: i  
+          type(polygon_point_) ::  y1,y2
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Body
 ! ----------------------------------------------------------------------------------------------------------------------
-        do ii=1,n
-          temp_array(ii)%y=array(ii)%y
-          temp_array(ii)%z=array(ii)%z
-        end do
-        do ii = 1, n
-          array(ii)%y = temp_array(index(ii))%y
-          array(ii)%z = temp_array(index(ii))%z
-        end do
-      end subroutine points_array_reindex
+        
+          nullify(Clipped_in)
+          nullify(Clipped_out)
+          nullify(workPolygon_in)
+          nullify(workPolygon_out)
+          nullify(inserted_polygon)
+          
+          Clipped_in => ClippedPolygon
+
+          if (ClippingPolygon%numpoint>1) then 
+            y2 = ClippingPolygon%point(1)
+          end if
+          do i=2,ClippingPolygon%numpoint ! for each edge i of the polygon ref
+            y1 = y2                       !  vertex 1 of edge i
+            y2 = ClippingPolygon%point(i) !  vertex 2 of edge i
+        
+            ! clip the work polygon by edge i
+            call edgeClipping(y1, y2, Clipped_in, workPolygon_in, workPolygon_out)
+            inserted_polygon => workPolygon_out
+            do while(allocated(inserted_polygon))
+              polygon_linked_list_insert_after(Clipped_out, inserted_polygon%p)
+              inserted_polygon => inserted_polygon%next
+            end do
+            Clipped_in => workPolygon_in
+            nullify(workPolygon_in)
+            nullify(workPolygon_out)
+          end do 
+          
+          
+
+        end subroutine
+
 
 
 
