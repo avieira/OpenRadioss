@@ -431,9 +431,9 @@
                        cycle
                     else
                     end if
-                     ratio = one
-                     if(icumu == 0)kvol(isubmat,ielg) = zero
-                     kvol(isubmat,ielg) = kvol(isubmat,ielg) + ratio*vfrac !100% inside
+                    ratio = one
+                    if(icumu == 0)kvol(isubmat,ielg) = zero
+                    kvol(isubmat,ielg) = kvol(isubmat,ielg) + ratio*vfrac !100% inside
                     ! if added volume ratio makes that sum is > 1, then substract from previous filling
                     if(icumu == -1)then
                       sumvf = sum(kvol(1:nbsubmat,ielg))
@@ -518,13 +518,13 @@
           !      list_quad and list_tria are listing elems which required polygonal clipping since
           !      they are partially cut by user polygon
           call polygon_SetClockWise( user_polygon )
-            if(debug)then
-             write (*,*)"  --> user polygon  "
-             do ii = 1, user_polygon%numpoint
-               write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,user_polygon%point(ii)%y ,user_polygon%point(ii)%z  !HM TCL SCRIPT TO CHECK USER POLYGON ON SCREEN
-             end do
-               write (*,*)"   "
-            end if
+          if(debug)then
+            write (*,*)"  --> user polygon  "
+            do ii = 1, user_polygon%numpoint
+              write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,user_polygon%point(ii)%y ,user_polygon%point(ii)%z  !HM TCL SCRIPT TO CHECK USER POLYGON ON SCREEN
+            end do
+            write (*,*)"   "
+          end if
           !
           ! --- QUAD CLIPPING
           call polygon_create(elem_polygon, 5)
@@ -539,14 +539,14 @@
             elem_polygon%numpoint = 5
             ! already oriented Y->Z
             call polygon_SetClockWise( elem_polygon )  !cen be removed if we already computed the area, then just set %area=...
-             if(debug)then
+            if(debug)then
               write (*,*)"  current elem  "
               !HM TCL SCRIPT TO CHECK ELEM ON SCREEN
               write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,elem_polygon%point(1)%y ,elem_polygon%point(1)%z
               write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,elem_polygon%point(2)%y ,elem_polygon%point(2)%z
               write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,elem_polygon%point(3)%y ,elem_polygon%point(3)%z
               write (*,FMT='(A,3F45.35)') "  *createnode ",0.0,elem_polygon%point(4)%y ,elem_polygon%point(4)%z
-             end if
+            end if
             !diagonal : max L1 norm
             xyz_elem(2) =                  elem_polygon%point(1)%y   ; xyz_elem(3) =                  elem_polygon%point(1)%z   ;
             xyz_elem(2) = min(xyz_elem(2), elem_polygon%point(2)%y ) ; xyz_elem(3) = min(xyz_elem(3), elem_polygon%point(2)%z ) ;
@@ -563,7 +563,7 @@
             ! clipping between user polygon and current quad
             iter=0
             iStatus = -1
-             tol = em06*elem_polygon%diag
+            tol = em06*elem_polygon%diag
             do while (iStatus /= 0 .and. iter < 10)
               !tolerance (to avoid vertice on any edge and avoid loops)
               tol=2*tol

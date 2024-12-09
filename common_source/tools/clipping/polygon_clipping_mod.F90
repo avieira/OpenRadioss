@@ -57,11 +57,11 @@
 
 
 ! ======================================================================================================================
-!                                                   FUNCTION
+!                                                   PROCEDURE
 ! ======================================================================================================================
-  function intersectPt(P1, P2, Q1, Q2, tol, alpha, beta) result(intersection)
 !! \brief Compute intersection point [P1,P2[ and {Q1,Q2[
 !! \details On [P1 P2[ : position is alpha in \[0,1[ and On [Q1 Q2[ : position is beta in \[0,1[
+  function intersectPt(P1, P2, Q1, Q2, tol, alpha, beta) result(intersection)
    use constant_mod , only : zero, one, ep20
     implicit none
 #include "my_real.inc"
@@ -793,26 +793,31 @@
       !||--- uses       -----------------------------------------------------
       !||    constant_mod                          ../common_source/modules/constant_mod.F
       !||====================================================================
-        subroutine Clipping_Sutherland_Hodgman(ClippedPolygon, ClippingPolygon, Clipped_in, Clipped_out, iStatus)
+        subroutine Clipping_Sutherland_Hodgman(ClippedPolygon, ClippingPolygon, Clipped_in, Clipped_out,&
+                                               pts_inside, pts_on_edge, ids_edge, iStatus)
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Modules
 ! ----------------------------------------------------------------------------------------------------------------------
-          use constant_mod , only : zero
+          use constant_mod, only : zero
           implicit none
 #include "my_real.inc"
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_linked_list_), pointer, intent(in) :: ClippedPolygon      !< Clipped Polygon
-          type(polygon_), intent(in) :: ClippingPolygon     !< Clipping Polygon
-          type(polygon_linked_list_), pointer, intent(out) :: Clipped_in    !< Polygons clipped
-          type(polygon_linked_list_), pointer, intent(out) :: Clipped_out   !< Polygons remaining from ClippedPolygon that are not clipped
-          integer,intent(inout) :: iStatus                  !< return code for algorithm status
+          type(polygon_linked_list_), pointer, intent(in)           :: ClippedPolygon      !< Clipped Polygon
+          type(polygon_), intent(in)                                :: ClippingPolygon     !< Clipping Polygon
+          type(polygon_linked_list_), pointer, intent(out)          :: Clipped_in    !> Polygons clipped
+          type(polygon_linked_list_), pointer, intent(out)          :: Clipped_out   !> Polygons remaining from ClippedPolygon that are not clipped
+          type(pair_points_linked_list_), pointer, intent(out)      :: pts_inside    !> Points of the clipped polygon inside the clipping polygon (not on boundary)
+          type(pointer_to_pair_points_linked_list_), allocatable, dimension(:), intent(out) :: pts_on_edge !>Points of the clipped polygon on the boundary of the clipping polygon
+          integer, allocatable, dimension(:), intent(in)            :: ids_edge     !<ids of the different edges
+          integer,intent(inout)                                     :: iStatus                  !< return code for algorithm status
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Local Variables
 ! ----------------------------------------------------------------------------------------------------------------------
           type(polygon_linked_list_), pointer :: workPolygon_in, workPolygon_out, inserted_polygon
-          integer :: i  
+          type(pair_points_linked_list_), pointer :: curr_pts_on_edge
+          integer :: i, edge_id 
           type(polygon_point_) ::  y1,y2
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Body
@@ -823,6 +828,7 @@
           nullify(workPolygon_in)
           nullify(workPolygon_out)
           nullify(inserted_polygon)
+          nullify(pts_inside)
           
           Clipped_in => ClippedPolygon
 
@@ -832,22 +838,27 @@
           do i=2,ClippingPolygon%numpoint ! for each edge i of the polygon ref
             y1 = y2                       !  vertex 1 of edge i
             y2 = ClippingPolygon%point(i) !  vertex 2 of edge i
+
+            curr_pts_on_edge => pts_on_edge(ids_edge(i-1))%l
         
             ! clip the work polygon by edge i
-            call edgeClipping(y1, y2, Clipped_in, workPolygon_in, workPolygon_out)
+            call edgeClipping(y1, y2, Clipped_in, workPolygon_in, workPolygon_out, &
+                              curr_pts_on_edge, pts_inside, i==ClippingPolygon%numpoint) 
+
             inserted_polygon => workPolygon_out
-            do while(allocated(inserted_polygon))
-              polygon_linked_list_insert_after(Clipped_out, inserted_polygon%p)
+            do while(associated(inserted_polygon))
+              call polygon_linked_list_insert_after(Clipped_out, inserted_polygon%p)
               inserted_polygon => inserted_polygon%next
             end do
+            call polygon_linked_list_destroy(workPolygon_out)
+            nullify(workPolygon_out)
+
             Clipped_in => workPolygon_in
             nullify(workPolygon_in)
-            nullify(workPolygon_out)
           end do 
           
-          
-
-        end subroutine
+          iStatus = 0
+        end subroutine Clipping_Sutherland_Hodgman
 
 
 

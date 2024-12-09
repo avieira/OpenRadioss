@@ -52,6 +52,15 @@
           type(polygon_linked_list_), pointer :: next
         end type polygon_linked_list_
 
+        type pair_points_linked_list_
+          type(polygon_point_), dimension(2) :: pts
+          type(pair_points_linked_list_), pointer :: next
+        end type pair_points_linked_list_
+
+        type pointer_to_pair_points_linked_list_
+          type(pair_points_linked_list_), pointer :: l
+        end type pointer_to_pair_points_linked_list_
+
       contains
 
 ! ======================================================================================================================
@@ -272,17 +281,13 @@
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-      !||====================================================================
-      !||    polygon_linked_list_insert_before   ../common_source/tools/clipping/polygon_mod.F90
-      !||--- calls      -----------------------------------------------------
-      !||    polygon_copy   ../common_source/tools/clipping/polygon_mod.F90
-      !||====================================================================
-        function polygon_linked_list_insert_before(list, p) result(new_elem)
+!\brief Inserts p in the linked list just before the head. Returns the new head.
+        function polygon_linked_list_insert_before(head, p) result(new_elem)
           implicit none
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_linked_list_), intent(in), pointer :: list
+          type(polygon_linked_list_), intent(in), pointer :: head
           type(polygon_), intent(in) :: p
           type(polygon_linked_list_), pointer :: new_elem
 
@@ -293,44 +298,36 @@
 !                                                   Body
 ! ----------------------------------------------------------------------------------------------------------------------
           allocate(new_elem)
-          polygon_copy(p, new_elem%p)
-          new_elem%next => list
+          call polygon_copy(p, new_elem%p)
+          new_elem%next => head
         end function polygon_linked_list_insert_before
 
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-      !||====================================================================
-      !||    polygon_linked_list_insert_after      ../common_source/tools/clipping/polygon_mod.F90
-      !||--- called by ------------------------------------------------------
-      !||    polygon_linked_list_copy              ../common_source/tools/clipping/polygon_mod.F90
-      !||    Clipping_Sutherland_Hodgman           ../common_source/tools/clipping/polygon_clipping_mod.F90
-      !||--- calls      -----------------------------------------------------
-      !||    polygon_copy                          ../common_source/tools/clipping/polygon_mod.F90
-      !||====================================================================
+!\brief Inserts p in the linked list 'list' just after.
         subroutine polygon_linked_list_insert_after(list, p)
           implicit none
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_linked_list_), intent(inout) :: list
+          type(polygon_linked_list_), pointer, intent(inout) :: list
           type(polygon_), intent(in) :: p
 
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Local Variables
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_), pointer :: old_next
-          type(polygon_linked_list_), target :: new_elem
+          type(polygon_linked_list_), pointer :: new_elem
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Body
 ! ----------------------------------------------------------------------------------------------------------------------
           if (.not. associated(list)) then 
             allocate(list)
-            polygon_copy(p, list%p)
+            call polygon_copy(p, list%p)
             nullify(list%next)
           else 
             allocate(new_elem)
-            polygon_copy(p, new_elem%p)
+            call polygon_copy(p, new_elem%p)
             new_elem%next => list%next
             list%next => new_elem
           end if
@@ -339,33 +336,29 @@
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-      !||====================================================================
-      !||    polygon_linked_list_copy   ../common_source/tools/clipping/polygon_mod.F90
-      !||--- calls      -----------------------------------------------------
-      !||    polygon_linked_list_insert_after   ../common_source/tools/clipping/polygon_mod.F90
-      !||====================================================================
+!\brief Copy the linked list `original` in `targ`. `targ` need not be allocated.
         subroutine polygon_linked_list_copy(original, targ)
           implicit none
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_linked_list_), intent(in) :: original
-          type(polygon_linked_list_), intent(out) :: targ
+          type(polygon_linked_list_), pointer, intent(in) :: original
+          type(polygon_linked_list_), pointer, intent(out) :: targ
 
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Local Variables
 ! ----------------------------------------------------------------------------------------------------------------------
-          type(polygon_linked_list_) :: current_targ, current_original
+          type(polygon_linked_list_), pointer :: current_targ, current_original
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Body
 ! ----------------------------------------------------------------------------------------------------------------------
-          allocate(targ)
+          if (.not. allocated(targ)) then allocate(targ) end if
           if (associated(original)) then
             nullify(targ%next)
             current_original => original
             current_targ => targ
             do while ( associated(current_original) )
-              polygon_linked_list_insert_after(current_targ, current%p)
+              call polygon_linked_list_insert_after(current_targ, current_original%p)
               current_original => current_original%next
               current_targ => current_targ%next
             end do
@@ -377,11 +370,6 @@
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-      !||====================================================================
-      !||    polygon_linked_list_destroy   ../common_source/tools/clipping/polygon_mod.F90
-      !||--- calls      -----------------------------------------------------
-      !||    polygon_destroy   ../common_source/tools/clipping/polygon_mod.F90
-      !||====================================================================
         subroutine polygon_linked_list_destroy( list )
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
@@ -399,7 +387,7 @@
           current => list
           do while ( associated(current%next) )
               next => current%next
-              polygon_destroy(current%p)
+              call polygon_destroy(current%p)
               deallocate( current )
               current => next
           enddo
@@ -408,11 +396,7 @@
 ! ======================================================================================================================
 !                                                   PROCEDURES
 ! ======================================================================================================================
-      !||====================================================================
-      !||    polygon_linked_list_delete_element   ../common_source/tools/clipping/polygon_mod.F90
-      !||--- calls      -----------------------------------------------------
-      !||    polygon_destroy   ../common_source/tools/clipping/polygon_mod.F90
-      !||====================================================================
+!\brief Searches `elem` in `list`, deletes it from the list ; also deallocates elem
         subroutine polygon_linked_list_delete_element( list, elem )
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
@@ -431,7 +415,7 @@
 ! ----------------------------------------------------------------------------------------------------------------------
           if ( associated(list,elem) ) then
               list => elem%next
-              polygon_destroy(elem%p)
+              call polygon_destroy(elem%p)
               deallocate( elem )
           else
               current => list
@@ -439,7 +423,7 @@
               do while ( associated(current) )
                   if ( associated(current,elem) ) then
                       prev%next => current%next
-                      polygon_destroy(elem%p)
+                      call polygon_destroy(elem%p)
                       deallocate( current ) ! Is also "elem"
                       exit
                   endif
@@ -448,4 +432,78 @@
               enddo
           endif
         end subroutine polygon_linked_list_delete_element
+
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+!\brief Inserts `p` in `list` just after.
+        subroutine pair_points_linked_list_insert_after(list, p)
+          implicit none
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(pair_points_linked_list_), pointer, intent(inout) :: list
+          type(polygon_point_), dimension(2), intent(in) :: p
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(pair_points_linked_list_), pointer :: new_elem
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          if (.not. associated(list)) then 
+            allocate(list)
+            list%pts = p
+            nullify(list%next)
+          else 
+            allocate(new_elem)
+            new_elem%pts = p
+            new_elem%next => list%next
+            list%next => new_elem
+          end if
+        end subroutine pair_points_linked_list_insert_after
+
+! ======================================================================================================================
+!                                                   PROCEDURES
+! ======================================================================================================================
+!\brief Searches `elem` in `list`, deletes it from the list ; also deallocates `elem`
+        subroutine pair_points_linked_list_delete_element( list, elem )
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Arguments
+! ----------------------------------------------------------------------------------------------------------------------
+          type(pair_points_linked_list_), pointer  :: list
+          type(pair_points_linked_list_), pointer  :: elem
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Local Variables
+! ----------------------------------------------------------------------------------------------------------------------
+          type(pair_points_linked_list_), pointer  :: current
+          type(pair_points_linked_list_), pointer  :: prev
+
+! ----------------------------------------------------------------------------------------------------------------------
+!                                                   Body
+! ----------------------------------------------------------------------------------------------------------------------
+          if ( associated(list,elem) ) then
+              list => elem%next
+              !deallocate( elem%pts )
+              nullify(elem%next)
+              deallocate( elem )
+          else
+              current => list
+              prev    => list
+              do while ( associated(current) )
+                  if ( associated(current,elem) ) then
+                      prev%next => current%next
+                      !deallocate( elem%pts )
+                      nullify( elem%next )
+                      deallocate( current ) ! Is also "elem"
+                      exit
+                  endif
+                  prev    => current
+                  current => current%next
+              enddo
+          endif
+        end subroutine pair_points_linked_list_delete_element
+
     end module polygon_mod
