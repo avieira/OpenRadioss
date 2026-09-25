@@ -167,9 +167,9 @@ void compute_lambdas2d_fortran_(const my_real_c *dt, \
                         long long* edge_indices, long long* max_length_array, long long* nb_normals, \
                         long long int *is_narrowband_ptr)
 {
-    Array_double *lambdas;
-    Vector_double *Lambda_n;
-    Vector_double *Lambda_np1;
+    Array_double *lambdas = NULL;
+    Vector_double *Lambda_n = NULL;
+    Vector_double *Lambda_np1 = NULL;
     bool is_narrowband;
     Vector_int64 *edge_vector = NULL;
     Vector_points3D* normals = NULL;    
@@ -355,6 +355,19 @@ void update_clipped_fortran_(const my_real_c* vec_move_clippedy, const my_real_c
         }
     }
 }                              
+
+/// @brief In a given cell, rebuild the polyhedron based on the level set description.
+/// @param level_set_tn  value of the level set at the 4 corner of a cell at time tn
+/// @param level_set_tnp1 value of the level set at the 4 corner of a cell at time tn
+/// @param dt 
+/// @param nb_tn number of negative values in level_set_tn
+/// @param nb_tnp1 number of negative values in level_set_tnp1
+/// @param is_reversed Tells if the polyhedron describes the second phase (false) or the first phase (true)
+void rebuild_polyhedron_fortran_(const my_real_c* level_set_tn, const my_real_c* level_set_tnp1, my_real_c* dt,\
+                                const long long int nb_tn, const long long int nb_tnp1, long long int *is_reversed){
+    
+    rebuild_polyhedron_level_set(grid, clipped3D, *dt, level_set_tn, level_set_tnp1, nb_tn, nb_tnp1, is_reversed);
+}
 
 void output_clipped_fortran_(my_real_c* x_v_clipped, my_real_c* y_v_clipped, long long* limits_polygons){ 
     uint64_t i, j_f, j, k, start, next, end_limits, pt_ind;

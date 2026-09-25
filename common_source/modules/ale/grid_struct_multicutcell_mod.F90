@@ -11,9 +11,9 @@ module grid2D_struct_multicutcell_mod
     real(kind=wp)                     :: lambdan_per_cell_target
     real(kind=wp)                     :: lambdanp1_per_cell
     real(kind=wp)                     :: lambdanp1_per_cell_target
-    type(Point2D)               :: normal_intern_face_space
+    type(Point2D)                     :: normal_intern_face_space
     real(kind=wp)                     :: normal_intern_face_time
-    type(Point2D)               :: p_normal_intern_face_space
+    type(Point2D)                     :: p_normal_intern_face_space
     real(kind=wp)                     :: p_normal_intern_face_time
     real(kind=wp)                     :: area
   end type grid2D_struct_multicutcell

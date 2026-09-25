@@ -102,23 +102,26 @@ contains
     end do
   end function find_root
 
-  ! Function to solve the Riemann problem for the Euler equations and return wave velocity and flux at the interface
-  ! wave-types: 1=left shock, 2=contact discontinuity, 3=right shock
-  subroutine solve_riemann_problem(gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR, wave_type, &
-                                  normalVecy, normalVecz, us, vsL, vsR, ps)
+  !! \brief Function to solve the Riemann problem for the Euler equations and return wave velocity and flux at the interface.
+  !! \details Also returns rho^* on each side of the wave.
+  !! \param wave_type: 1=left shock, 2=contact discontinuity, 3=right shock
+  subroutine solve_riemann_problem_with_rho(gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR, wave_type, &
+                                  normalVecy, normalVecz, us, vsL, vsR, rhosL, rhosR, ps)
     implicit none
 
-    real(kind=wp) :: gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR
-    integer :: wave_type
-    real(kind=wp) :: normalVecy, normalVecz
-    real(kind=wp) :: us, vsL, vsR, ps
+    real(kind=wp), intent(in) :: gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR
+    integer, intent(in) :: wave_type
+    real(kind=wp), intent(in) :: normalVecy, normalVecz
+    real(kind=wp), intent(out) :: us, vsL, vsR, ps
+    real(kind=wp), intent(out) :: rhosL, rhosR
 
     real(kind=wp), parameter :: prec_root_find = 1e-10
 
     real(kind=wp) :: uL, uR, vL, vR, aL, aR
     real(kind=wp) :: SL, SR
     real(kind=wp) :: p_star, u_star
-    real(kind=wp) :: rho_starL, rho_starR, v_starL, v_starR
+    real(kind=wp) :: v_starL, v_starR
+    real(kind=wp) :: rho_starL, rho_starR
 
     uL = velyL*normalVecy + velzL*normalVecz
     uR = velyR*normalVecy + velzR*normalVecz
@@ -168,16 +171,39 @@ contains
       vsL = v_starL
       vsR = v_starR
       ps = p_star
+      rhosL = rho_starL
+      rhosR = rho_starR
     elseif (wave_type == 1) then
       us = SL
       vsL = vL
       vsR = v_starL
       ps = pL
+      rhosL = rhoL
+      rhosR = rho_starL
     elseif (wave_type == 3) then
       us = SR
       vsL = v_starR
       vsR = vR
       ps = pR
+      rhosL = rho_starR
+      rhosR = rhoR
     end if
+  end subroutine solve_riemann_problem_with_rho
+
+  !! \brief Function to solve the Riemann problem for the Euler equations and return wave velocity and flux at the interface
+  !! \param wave_type: 1=left shock, 2=contact discontinuity, 3=right shock
+  subroutine solve_riemann_problem(gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR, wave_type, &
+                                  normalVecy, normalVecz, us, vsL, vsR, ps)
+    implicit none
+
+    real(kind=wp), intent(in) :: gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR
+    integer, intent(in) :: wave_type
+    real(kind=wp), intent(in) :: normalVecy, normalVecz
+    real(kind=wp), intent(out) :: us, vsL, vsR, ps
+
+    real(kind=wp) :: rhosL, rhosR
+
+    call solve_riemann_problem_with_rho(gammaL, gammaR, rhoL, rhoR, velyL, velyR, velzL, velzR, pL, pR, wave_type, &
+                                  normalVecy, normalVecz, us, vsL, vsR, rhosL, rhosR, ps)
   end subroutine solve_riemann_problem
 end module riemann_solver_mod

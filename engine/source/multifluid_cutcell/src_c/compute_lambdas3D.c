@@ -118,22 +118,30 @@ Polyhedron3D* clip3D(const Polyhedron3D *clipper, const Polyhedron3D *clipped){
 ///          `lambdas`, the effective area in a list ordered in the same order.
 ///          In `lambdas`, we store the effective area and the "complementarity", which is the area of the face minus the effective area.
 /// @param grid [IN] Clipper cell
-/// @param initial_p [IN] Clipped polygon
+/// @param p [IN] Clipped polygon
 /// @param lambdas [OUT] effective areas (allocated inside the function)
 /// @param normals_ptr [OUT] list of normal vectors of the faces of `initial_p` inside `grid`.
 /// @param edge_indices [OUT] list of edge indices clipped inside grid.
 /// @param is_narrowband [OUT] true if the intersection of `grid` and `initial_p` is not empty, false otherwise.
-void compute_lambdas2D_time(const Polyhedron3D* grid, const Polyhedron3D *initial_p, \
+void compute_lambdas2D_time_clipped(const GrB_Index nb_edge, const Polyhedron3D *p, \
                         Vector_points3D **lambdas, Vector_points3D **normals_ptr, Vector_int64 **edge_indices, bool *is_narrowband){
-    Polyhedron3D *p = clip3D(grid, initial_p);
-    GrB_Index nb_edge, nb_cols_vol, nb_cols_fac, i, j;//, e;
-    Point3D *nvpi, *lam, nm;
+    GrB_Index nb_cols_vol, nb_cols_fac, i, j;//, e;
+    Point3D *nvpi, *lam;
     my_real_c press_f;
     int8_t pvij_int;
     long int *psfi;
     int64_t psfim2;
     my_real_c pvij;
     Vector_points3D *norm_vec_poly;
+
+    if (!(*lambdas)){
+        *lambdas = alloc_with_capacity_vec_pts3D(nb_edge);
+    }
+
+    Point3D nm = (Point3D){0.0, 0.0, 0.0};
+    for (j=0; j<nb_edge; j++){
+        set_ith_elem_vec_pts3D(*lambdas, j, &nm);
+    }
 
     if (!(*normals_ptr)){
         *normals_ptr = alloc_empty_vec_pts3D();
@@ -143,14 +151,6 @@ void compute_lambdas2D_time(const Polyhedron3D* grid, const Polyhedron3D *initia
         *edge_indices = alloc_empty_vec_int64();
     }
     (*edge_indices)->size = 0;
-
-    GrB_Matrix_ncols(&nb_edge, *(grid->faces)); //actually number of edges + 2 faces at times tn and tn+dt
-
-    *lambdas = alloc_with_capacity_vec_pts3D(nb_edge);
-    nm = (Point3D){0.0, 0.0, 0.0};
-    for (j=0; j<nb_edge; j++){
-        set_ith_elem_vec_pts3D(*lambdas, j, &nm);
-    }
 
 
     *is_narrowband = false;
@@ -192,24 +192,55 @@ void compute_lambdas2D_time(const Polyhedron3D* grid, const Polyhedron3D *initia
                         }
                         inplace_axpy_points3D(lam, 1.0, nvpi);
                     }
-                    //for (e = 1; e<=nb_edge; e++){
-                    //    if (*psfi == ((long int) e)){
-                    //        lam = get_ith_elem_vec_pts3D(lambdas, e-1);
-                    //        inplace_axpy_points3D(lam, 1.0, nvpi);
-                    //    }
-                    //}
                 }
             }
         }
+
+        dealloc_vec_pts3D(norm_vec_poly); free(norm_vec_poly);
+    }
+}
+
+/// @brief Compute the effective area on each face of grid.
+/// @details The effective area is the area of each face of `grid` minus the area intersected with `initial_p`.
+///          The result consists in an ordered list of the faces of `grid` and 
+///          `lambdas`, the effective area in a list ordered in the same order.
+///          In `lambdas`, we store the effective area and the "complementarity", which is the area of the face minus the effective area.
+/// @param grid [IN] Clipper cell
+/// @param initial_p [IN] Polyhedron that will be clipped by grid
+/// @param lambdas [OUT] effective areas (allocated inside the function)
+/// @param normals_ptr [OUT] list of normal vectors of the faces of `initial_p` inside `grid`.
+/// @param edge_indices [OUT] list of edge indices clipped inside grid.
+/// @param is_narrowband [OUT] true if the intersection of `grid` and `initial_p` is not empty, false otherwise.
+void compute_lambdas2D_time(const Polyhedron3D* grid, const Polyhedron3D *initial_p, \
+                        Vector_points3D **lambdas, Vector_points3D **normals_ptr, Vector_int64 **edge_indices, bool *is_narrowband){
+    GrB_Index nb_edge;
+    Polyhedron3D *p = clip3D(grid, initial_p);
+    GrB_Index j;
+
+    GrB_Matrix_ncols(&nb_edge, *(grid->faces)); //actually number of edges + 2 faces at times tn and tn+dt
+    if (!(*lambdas)){
+        *lambdas = alloc_with_capacity_vec_pts3D(nb_edge);
     }
 
+    if (!(*normals_ptr)){
+        *normals_ptr = alloc_empty_vec_pts3D();
+    }
+    (*normals_ptr)->size = 0;
+    if (!(*edge_indices)){
+        *edge_indices = alloc_empty_vec_int64();
+    }
+    (*edge_indices)->size = 0;
+
+
+
     if(p){
-        //printf("Status face = ");
-        //print_vec_int(p->status_face);
-        //printf("norm_vec_poly = ");
-        //print_vec_pt3D(*norm_vec_poly);
-        dealloc_vec_pts3D(norm_vec_poly); free(norm_vec_poly);
+        compute_lambdas2D_time_clipped(nb_edge, p, lambdas, normals_ptr, edge_indices, is_narrowband);
         dealloc_Polyhedron3D(p); free(p);
+    } else {
+        Point3D nm = (Point3D){0.0, 0.0, 0.0};
+        for (j=0; j<nb_edge; j++){
+            set_ith_elem_vec_pts3D(*lambdas, j, &nm);
+        }
     }
 }
 
@@ -232,8 +263,8 @@ void compute_lambdas2D(const Polygon2D* grid, const Polyhedron3D *clipped3D, con
     const unsigned int nb_regions = 2;
     my_real_c *val = (my_real_c*)malloc(sizeof(my_real_c));
     my_real_c nm;
-    Point3D *area, *occupied;
-    Vector_points3D *occupied_area;
+    Point3D *area = NULL, *occupied = NULL;
+    Vector_points3D *occupied_area = NULL;
     //Polygon2D *mini_clipped;
     Polyhedron3D *cell3D = NULL;
     //long *sfj;
@@ -244,8 +275,8 @@ void compute_lambdas2D(const Polygon2D* grid, const Polyhedron3D *clipped3D, con
     Vector_points3D *surfaces = NULL;
     GrB_Index nb_edge, i, j, k;
     //GrB_Index nb_clipped_faces;
-    Vector_points3D *lambdas3D; //TODO : Change this when nb_regions>2
-    Array_points3D *local_lambdas;
+    Vector_points3D *lambdas3D = NULL; //TODO : Change this when nb_regions>2
+    Array_points3D *local_lambdas = NULL;
     
     GrB_Matrix_ncols(&nb_edge, *(grid->edges));
     *lambdas_arr = alloc_with_capacity_arr_double(nb_edge, nb_regions); //All set to 0
